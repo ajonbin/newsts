@@ -1,4 +1,3 @@
-from re import finditer
 import ChatTTS
 import torch
 import torchaudio
