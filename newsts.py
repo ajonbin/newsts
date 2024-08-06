@@ -1,10 +1,12 @@
 import ChatTTS
+import datetime
 import torch
 import torchaudio
 from typing import List
 import argparse
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
+
 
 def advanced(texts: List[str]):
     chat = ChatTTS.Chat()
@@ -48,6 +50,11 @@ def massage_data(original_lines: List[str]) -> List[str]:
     print(clean_lines)
     return clean_lines
 
+def get_output_name()-> str:
+      """Gets the current time as a string in the format 'xxxx year xx month xx day AM or PM'."""
+      now = datetime.datetime.now()
+      am_pm = "早新闻" if now.hour < 12 else "晚新闻"
+      return f"{now.year}年{now.month}月{now.day}日{am_pm}"
 
 def main():
     parser = argparse.ArgumentParser(description='News To Speech')
@@ -64,10 +71,11 @@ def main():
     final_lines = massage_data(news_lines)
 
     # Generate wav for every line
-    wavs = advanced(final_lines)
-    wav_count = len(wavs)
-    for i in range(wav_count):
-        torchaudio.save(f"{output_path}/output_{i}.wav", torch.from_numpy(wavs[i]).unsqueeze(0), 24000)
+    wav_count = len(final_lines)
+    for index, line in enumerate(final_lines):
+        print(line)
+        wavs = advanced([line])
+        torchaudio.save(f"{output_path}/output_{index}.wav", torch.from_numpy(wavs[0]).unsqueeze(0), 24000)
 
     # Merge wav
     combined_wav = AudioSegment.empty()
@@ -75,12 +83,12 @@ def main():
          combined_wav = combined_wav + AudioSegment.from_wav(f"{output_path}/output_{i}.wav")
 
     # Remove silence chunk
-    audio_chunks = split_on_silence(combined_wav, min_silence_len = 200, silence_thresh = -45, keep_silence = 100)
+    audio_chunks = split_on_silence(combined_wav, silence_thresh = -45)
     final_wav = AudioSegment.empty()
     for chunk in audio_chunks:
         final_wav += chunk
 
-    output_audio = f"{output_path}/output.mp3"
+    output_audio = f"{output_path}/{get_output_name()}.mp3"
     final_wav.export(output_audio, format="mp3")
 
     print("=================================")
