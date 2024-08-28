@@ -24,6 +24,7 @@ def advanced(texts: List[str]):
         temperature = .3,   # using custom temperature
         top_P = 0.7,        # top P decode
         top_K = 20,         # top K decode
+        max_new_token = 20480,
     )
 
     ###################################
@@ -33,6 +34,7 @@ def advanced(texts: List[str]):
     # to generate special token in text to synthesize.
     params_refine_text = ChatTTS.Chat.RefineTextParams(
         prompt='[oral_2][laugh_0][break_6]',
+        max_new_token = 3840
     )
 
     wavs = chat.infer(
@@ -53,7 +55,7 @@ def massage_data(original_lines: List[str]) -> List[str]:
 def get_output_name()-> str:
       """Gets the current time as a string in the format 'xxxx year xx month xx day AM or PM'."""
       now = datetime.datetime.now()
-      am_pm = "早新闻" if now.hour < 12 else "晚新闻"
+      am_pm = "晨间朗读" if now.hour < 12 else "晚间朗读"
       return f"{now.year}年{now.month}月{now.day}日{am_pm}"
 
 def main():
@@ -89,8 +91,10 @@ def main():
         final_wav += chunk
 
     output_audio = f"{output_path}/{get_output_name()}.mp3"
-    final_wav.export(output_audio, format="mp3")
+    final_wav.export(f"{output_audio}", format="mp3", bitrate="192k")
 
+    metadata = torchaudio.info(f"{output_audio}")
+    print(metadata)
     print("=================================")
     print(f"Output: {output_audio}")
     print("=================================")
