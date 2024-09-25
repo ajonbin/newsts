@@ -7,4 +7,4 @@ sleep 3
 echo "Start trigger"
 
 python news_trigger.py
-python newsts.py
+#python newsts.py

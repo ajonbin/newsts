@@ -1,14 +1,15 @@
+from typing_extensions import Optional
 import ChatTTS
-import datetime
 import torch
 import torchaudio
 from typing import List
 import argparse
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
+from news_util import get_output_name, get_voice_pickle_name, get_news_dir
+import pickle
 
-
-def advanced(texts: List[str]):
+def advanced(texts: List[str], idx: Optional[int]=None):
     chat = ChatTTS.Chat()
     #chat.load('huggingface',compile=True, force_redownload=False) # Set to True for better performance
     chat.load(compile=False) # Set to True for better performance
@@ -17,7 +18,8 @@ def advanced(texts: List[str]):
     # Sample a speaker from Gaussian.
 
     rand_spk = chat.sample_random_speaker()
-    print(rand_spk) # save it for later timbre recovery
+    with open(get_voice_pickle_name(idx), "wb") as file:
+        pickle.dump(rand_spk, file)
 
     params_infer_code = ChatTTS.Chat.InferCodeParams(
         spk_emb = rand_spk, # add sampled speaker
@@ -33,7 +35,8 @@ def advanced(texts: List[str]):
     # use oral_(0-9), laugh_(0-2), break_(0-7)
     # to generate special token in text to synthesize.
     params_refine_text = ChatTTS.Chat.RefineTextParams(
-        prompt='[oral_2][laugh_0][break_6]',
+        #prompt='[oral_2][laugh_0][break_6]',
+        prompt='[oral_2][break_6]',
         max_new_token = 3840
     )
 
@@ -49,18 +52,13 @@ def massage_data(original_lines: List[str]) -> List[str]:
     for line in original_lines:
         lines.extend(line.strip().split('。'))
     clean_lines = [s for s in lines if len(s)>0]
-    print(clean_lines)
     return clean_lines
 
-def get_output_name()-> str:
-      """Gets the current time as a string in the format 'xxxx year xx month xx day AM or PM'."""
-      now = datetime.datetime.now()
-      am_pm = "晨间朗读" if now.hour < 12 else "晚间朗读"
-      return f"{now.year}年{now.month}月{now.day}日{am_pm}"
 
 def main():
     parser = argparse.ArgumentParser(description='News To Speech')
-    parser.add_argument('-f',"--news-file", help="Text file include news lines", type=str, default="news.txt")
+    news_txt_name = f"{get_news_dir()}/{get_output_name()}.txt"
+    parser.add_argument('-f',"--news-file", help="Text file include news lines", type=str, default=news_txt_name)
     args = parser.parse_args()
 
     output_path = "output"
@@ -75,8 +73,7 @@ def main():
     # Generate wav for every line
     wav_count = len(final_lines)
     for index, line in enumerate(final_lines):
-        print(line)
-        wavs = advanced([line])
+        wavs = advanced([line],index)
         torchaudio.save(f"{output_path}/output_{index}.wav", torch.from_numpy(wavs[0]).unsqueeze(0), 24000)
 
     # Merge wav
@@ -85,13 +82,13 @@ def main():
          combined_wav = combined_wav + AudioSegment.from_wav(f"{output_path}/output_{i}.wav")
 
     # Remove silence chunk
-    audio_chunks = split_on_silence(combined_wav, silence_thresh = -45)
-    final_wav = AudioSegment.empty()
-    for chunk in audio_chunks:
-        final_wav += chunk
+    # audio_chunks = split_on_silence(combined_wav, silence_thresh = -45)
+    # final_wav = AudioSegment.empty()
+    # for chunk in audio_chunks:
+    #     final_wav += chunk
 
     output_audio = f"{output_path}/{get_output_name()}.mp3"
-    final_wav.export(f"{output_audio}", format="mp3", bitrate="192k")
+    combined_wav.export(f"{output_audio}", format="mp3", bitrate="192k")
 
     metadata = torchaudio.info(f"{output_audio}")
     print(metadata)
